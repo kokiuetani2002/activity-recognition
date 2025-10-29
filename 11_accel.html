@@ -34,6 +34,13 @@
         <button onclick="setLabel('stairs')" style="padding: 10px 20px; margin: 5px; font-size: 1.2em; background-color: #ffe0b2;">階段</button>
       </div>
       <p>Current Label / 現在のラベル: <span id="current_label" style="color: blue; font-weight: bold; font-size: 1.5em;">none</span></p>
+      
+      <div style="margin: 15px 0; padding: 10px; background-color: #fff9c4; border-radius: 5px;">
+        <h3>30秒タイマー機能 / 30-Second Timer</h3>
+        <button onclick="start30SecondCollection()" style="padding: 15px 30px; margin: 10px; font-size: 1.3em; background-color: #2196F3; color: white; border: none; cursor: pointer;">⏱️ 30秒間データ収集 / Collect for 30s</button>
+        <p>残り時間 / Time Remaining: <span id="timer_display" style="color: red; font-weight: bold; font-size: 2.0em;">--</span> 秒</p>
+      </div>
+      
       <p>Collected Data Points / 収集データ数: <span id="data_count" style="color: green; font-weight: bold; font-size: 1.5em;">0</span></p>
       <button onclick="downloadCSV()" style="padding: 15px 30px; margin: 10px; font-size: 1.3em; background-color: #4CAF50; color: white; border: none; cursor: pointer;">Download CSV / CSVダウンロード</button>
       <button onclick="clearCollectedData()" style="padding: 15px 30px; margin: 10px; font-size: 1.3em; background-color: #f44336; color: white; border: none; cursor: pointer;">Clear Data / データクリア</button>
@@ -138,6 +145,11 @@ var zave = 0.0;
 //Data collection variables
 var collectedData = []; // Array to store all collected data with labels
 var currentLabel = 'none'; // Current activity label
+
+//Timer variables
+var timerInterval = null; // Timer interval ID
+var remainingTime = 0; // Remaining time in seconds
+var isCollecting = false; // Flag to track if collection is active
 
 //////////////////////////////////////////////////////
 //Function to get sensor access permission from the browser
@@ -342,6 +354,120 @@ function clearCollectedData(){
         collectedData = [];
         $('#data_count').text('0');
         alert('All data cleared! / 全てのデータをクリアしました！');
+    }
+}
+
+////////////////////////////////////////////////////////////////////
+//30-Second Timer Functions / 30秒タイマー機能
+////////////////////////////////////////////////////////////////////
+
+// Start 30-second data collection
+function start30SecondCollection(){
+    // Check if label is set
+    if(currentLabel === 'none'){
+        alert('Please select an activity label first! / 先に行動ラベルを選択してください！');
+        return;
+    }
+    
+    // Check if already collecting
+    if(isCollecting){
+        alert('Collection already in progress! / 既に収集中です！');
+        return;
+    }
+    
+    // Start motion sensing if not already started
+    if ( DeviceMotionEvent &&
+         typeof DeviceMotionEvent.requestPermission === 'function' ){
+        // iOS 13+ の Safari
+        DeviceMotionEvent.requestPermission().then(permissionState => {
+            if (permissionState === 'granted') {
+                window.addEventListener("devicemotion", handleAcceleration, false);
+                startTimer();
+            } else {
+                alert("Permission not granted! / 許可されませんでした！");
+            }
+        }).catch(console.error)
+    } else {
+        // For other devices
+        window.addEventListener("devicemotion", handleAcceleration, false);
+        startTimer();
+    }
+}
+
+// Start the timer
+function startTimer(){
+    isCollecting = true;
+    remainingTime = 30;
+    $('#timer_display').text(remainingTime);
+    
+    // Beep sound at start
+    if (window.AudioContext || window.webkitAudioContext) {
+        playBeep(440, 200); // 440Hz for 200ms
+    }
+    
+    alert('30秒間のデータ収集を開始します！/ Starting 30-second collection!');
+    
+    // Update timer every second
+    timerInterval = setInterval(function(){
+        remainingTime--;
+        $('#timer_display').text(remainingTime);
+        
+        // When time is up
+        if(remainingTime <= 0){
+            stopTimer();
+        }
+        
+        // Beep at 10, 5, 3, 2, 1 seconds remaining
+        if(remainingTime === 10 || remainingTime === 5 || remainingTime <= 3 && remainingTime > 0){
+            if (window.AudioContext || window.webkitAudioContext) {
+                playBeep(880, 100); // Higher pitch beep
+            }
+        }
+    }, 1000);
+}
+
+// Stop the timer and collection
+function stopTimer(){
+    if(timerInterval){
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+    
+    isCollecting = false;
+    remainingTime = 0;
+    $('#timer_display').text('--');
+    
+    // Stop motion sensing
+    window.removeEventListener("devicemotion", handleAcceleration, false);
+    
+    // Final beep (lower pitch, longer duration)
+    if (window.AudioContext || window.webkitAudioContext) {
+        playBeep(220, 500);
+    }
+    
+    alert('30秒間のデータ収集が完了しました！/ 30-second collection completed!\n\n収集データ数 / Data points: ' + collectedData.length);
+}
+
+// Play beep sound
+function playBeep(frequency, duration){
+    try {
+        var audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        var oscillator = audioContext.createOscillator();
+        var gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = frequency;
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration/1000);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + duration/1000);
+    } catch(e) {
+        console.log('Audio not supported:', e);
     }
 }
 
