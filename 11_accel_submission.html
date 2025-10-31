@@ -1,0 +1,279 @@
+<html>
+
+  <head>
+    <title>jQuery Mobile page</title>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,user-scalable=no,initial-scale=1,maximum-scale=1">
+    <meta name="mobile-web-app-capable" content="yes">
+    
+    <link rel="stylesheet" href="https://web.sfc.keio.ac.jp/~slash/ABC/ac/themes/TOBASIC.css" />
+    <link rel="stylesheet" href="https://web.sfc.keio.ac.jp/~slash/ABC/ac/themes/jquery.mobile.icons.min.css" />
+
+    <script src="https://code.jquery.com/jquery-1.11.1.min.js"></script> 
+    <script src="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+
+    <link rel="stylesheet" href="https://code.jquery.com/mobile/1.4.5/jquery.mobile.structure-1.4.5.min.css" /> 
+  </head>
+  
+  <body>
+    <button onclick="requestMotionPermission()">Get permission and start sensing</button>
+    <button onclick="stopDeviceMotion()">Stop</button>
+
+    <h2>Activity Recognition</h2>
+    <h3>(3) Classification result</h3>
+    <ul>
+    <li> Result: <span id="current_result" style="color:red;font-size:2.0em; font-weight: bold; border-top: 1px solid black; border-bottom: 1px solid black;">null</span> </li> 
+    </ul>
+    
+    <h3>(2) Features for this time window</h3>
+    <ul>
+    <li> min x: <span id="xmin">0</span> </li>
+    <li> max x: <span id="xmax">0</span> </li>
+    <li> ave x: <span id="xave">0</span> </li>
+    <li> variance x: <span id="xvariance">0</span> </li>
+
+    <li> min y: <span id="ymin">0</span> </li>
+    <li> max y: <span id="ymax">0</span> </li>
+    <li> ave y: <span id="yave">0</span> </li>
+    <li> variance y: <span id="yvariance">0</span> </li>
+
+    <li> min z: <span id="zmin">0</span> </li>
+    <li> max z: <span id="zmax">0</span> </li>
+    <li> ave z: <span id="zave">0</span> </li>
+    <li> variance z: <span id="zvariance">0</span> </li>
+    </ul>
+
+    <h3>(1) Raw sensor values for this time window</h3>
+    <ul>
+    <li> X: <span id="accel-x">0</span> </li> 
+    <li> Y: <span id="accel-y">0</span> </li> 
+    <li> Z: <span id="accel-z">0</span> </li>
+    </ul>
+    
+    <textarea id="raw-data" style="width:90%;height:50vh;"></textarea>
+
+    <hr/>
+
+    <h2>レポート記述欄 / Report</h2>
+    <ul>
+      <li>Name / 氏名: 上谷航輝</li>
+      <li>Department / 学部: 環境情報学部</li>
+      <li>Year / 学年:</li>
+      <li>Student ID / 学籍番号: 72140894</li>
+      <li>CNS Email / CNSメールアドレス: iamkoki@keio.jp</li>
+    </ul>
+
+    <h3>Collected Data / 収集した行動データ</h3>
+    <ul>
+      <li>Reason behind data selection / 選定した理由: 散歩は日常的に行う活動であり、のんびりと時間を気にせずゆったり歩くことを好む一方で、駅構内などでは移動効率を重視して速く歩くことが多い。同じ「歩く」という動作であっても、状況や感情によって動作パターンが大きく異なる点に興味を持った。本実験では、散歩（sanpo）、通学歩行（tuugaku_walk）、静止（still）、四足歩行（yotsunbai）の4種類の活動を選定した。散歩と通学歩行は同じ歩行動作でありながら速度やリズムが異なる。四足歩行はハイハイの動作であり、通常の歩行とは異なる動作パターンを示す。静止は動きがない状態の基準として選定した。これら4種類の活動は測定が容易であり、明確に区別できるため選定した。</li>
+      <li>Details about collection / 収集についての詳細</li>
+      <li>Any challenges and tweaks / 工夫した点・困難だった点: 特に大きな問題は発生しなかった。各活動2分間のデータ収集により、十分なデータ量を確保できた。</li>
+    </ul>
+
+    <h3>Features / 特徴量</h3>
+    <ul>
+      <li>Reason behind data selection / 選定した理由: 適切な特徴量を選定するため、GitHubなどで公開されている既存の行動認識データセット（UCI HAR Dataset）を用いて検証を行った。しかし、本実験で収集したデータは各活動2分間と比較的短いため、複雑な特徴量を使用すると過学習のリスクが高まることが判明した。そのため、時領域の基本的な統計特徴量（max, min, average, variance）に限定し、X, Y, Z軸それぞれについて計12個の特徴量を使用することとした。</li>
+      <li>Details about additional feature types / 追加した特徴量について</li>
+      <li>Any challenges and tweaks / 工夫した点・困難だった点</li>
+    </ul>    
+
+    <h3>ML Model / 機械学習モデル</h3>
+    <ul>
+      <li>Algorithm you used and the training result / 採用したアルゴリズムや学習結果の詳細: Pythonのscikit-learnライブラリを使用し、決定木（Decision Tree Classifier）アルゴリズムを採用した。Gini不純度を基準として、10-fold Cross-Validationで評価を行った結果、精度96.54%（標準偏差0.0355）を達成した。各活動の精度は、静止（still）98.7%、散歩（sanpo）98.7%、通学歩行（tuugaku_walk）93.7%、四足歩行（yotsunbai）94.9%であった。特徴量は12個（X, Y, Z軸それぞれのmax, min, average, variance）を使用した。</li>
+      <li>Any challenges and tweaks / 工夫した点・困難だった点</li>
+    </ul>
+
+    <h3>Real-time execution result / 実機に移植しての性能評価</h3>
+    <ul>
+      <li>Evaluation metric you used / 評価尺度について</li>
+      <li>Evaluation results / 評価結果</li>
+      <li>Any challenges and tweaks / 工夫した点・困難だった点</li>
+    </ul>
+
+  </body>
+
+
+<!--  ===========================================  -->
+<script type="text/javascript">
+
+alert("Welcome to example Activity Recognition (11).");
+
+//CONFIG: Length of each time window
+const NUM_DATA_PER_FRAME = 200;
+
+//Arrays for saving the raw sensor data
+var xdata = [];
+var ydata = [];
+var zdata = [];
+var num_data = 0;
+
+//Features
+var xmin = 0.0;
+var xmax = 0.0;
+var xave = 0.0;
+var xvariance = 0.0;
+var ymin = 0.0;
+var ymax = 0.0;
+var yave = 0.0;
+var yvariance = 0.0;
+var zmin = 0.0;
+var zmax = 0.0;
+var zave = 0.0;
+var zvariance = 0.0;
+
+//////////////////////////////////////////////////////
+//Function to get sensor access permission from the browser
+//////////////////////////////////////////////////////
+function requestMotionPermission(){
+  if ( DeviceMotionEvent &&
+       typeof DeviceMotionEvent.requestPermission === 'function' ){
+      // iOS 13+ の Safari
+      // 許可を取得
+      DeviceMotionEvent.requestPermission().then(permissionState => {
+	  if (permissionState === 'granted') {
+              // 許可を得られた場合、devicemotionをイベントリスナーに追加
+	      window.addEventListener("devicemotion", handleAcceleration, false);
+	  } else {
+              // 許可を得られなかった場合の処理
+	      console.log("Perrmission not granted!");
+	      alert("Perrmission not granted!");
+	  }
+      }).catch(console.error) // https通信でない場合などで許可を取得できなかった場合
+
+  } else {
+      //For other devices
+      console.log("detected other device. so adding listener...");
+      window.addEventListener("devicemotion", handleAcceleration, false);
+  }
+
+}
+
+function stopDeviceMotion(){ 
+    window.removeEventListener("devicemotion", handleAcceleration, false);
+}
+
+
+////////////////////////////////////////////////////////////////////
+//Function(1): 読み込まれてきた最新の加速度データ(X,Y,Z)を処理する関数
+//  - この関数は(機種によりますが) 秒速10〜100回というような高頻度で呼ばれます
+////////////////////////////////////////////////////////////////////
+function handleAcceleration(ev){
+
+    //alert("" + event.acceleration.x + " " + event.acceleration.y + " " + event.acceleration.z);
+    $('#accel-x').text( ev.acceleration.x );
+    xdata.push(ev.acceleration.x);
+    $('#accel-y').text( ev.acceleration.y );
+    ydata.push(ev.acceleration.y);
+    $('#accel-z').text( ev.acceleration.z );
+    zdata.push(ev.acceleration.z);
+    $('#raw-data').append(ev.acceleration.x + ", " + ev.acceleration.y + ", " + ev.acceleration.z + "\n");
+
+    num_data++;
+    //If we have enough raw sensor data...
+    if( num_data == NUM_DATA_PER_FRAME ){
+
+	//execute feature calculations.
+	featureExtraction();
+
+	//Let's classify the activity!
+	var current_activity = classify();
+	$('#current_result').text( current_activity );
+	
+	//clear the raw sensor data
+	xdata=[];
+	ydata=[];
+	zdata=[];
+	//Clear the textarea 
+	$('#raw-data').empty();
+	//Counter back to 0
+	num_data=0;
+    }
+    
+}
+
+////////////////////////////////////////////////////////////////////
+//Function(2):センサデータから "feature"(特徴量)を計算する関数
+//  - この関数は NUM_DATA_PER_FRAME 変数で設定された数だけセンサデータが
+//    「設定されたタイムフレーム」にたまる度に呼ばれます。
+//  - 例: センサデータが 50Hz (=50 data / seconds)
+//        NUM_DATA_PER_FRAME が 200 の場合
+//        → 約4秒に1度の頻度で呼ばれます
+////////////////////////////////////////////////////////////////////
+//helper func. to calculate average
+const arrAvg = arr => arr.reduce((a,b) => a + b, 0) / arr.length
+
+//helper func. to calculate variance
+function arrVariance(arr, avg) {
+    if(arr.length === 0) return 0;
+    var sum = 0;
+    for(var i = 0; i < arr.length; i++){
+        sum += Math.pow(arr[i] - avg, 2);
+    }
+    return sum / arr.length;
+}
+
+function featureExtraction(){
+    xmin = Math.min.apply(Math, xdata); $('#xmin').text(xmin.toFixed(3));
+    xmax = Math.max.apply(Math, xdata); $('#xmax').text(xmax.toFixed(3));
+    xave = arrAvg(xdata); $('#xave').text(xave.toFixed(3));
+    xvariance = arrVariance(xdata, xave); $('#xvariance').text(xvariance.toFixed(3));
+    
+    ymin = Math.min.apply(Math, ydata); $('#ymin').text(ymin.toFixed(3));
+    ymax = Math.max.apply(Math, ydata); $('#ymax').text(ymax.toFixed(3));
+    yave = arrAvg(ydata); $('#yave').text(yave.toFixed(3));
+    yvariance = arrVariance(ydata, yave); $('#yvariance').text(yvariance.toFixed(3));
+
+    zmax = Math.max.apply(Math, zdata); $('#zmax').text(zmax.toFixed(3));
+    zmin = Math.min.apply(Math, zdata); $('#zmin').text(zmin.toFixed(3));
+    zave = arrAvg(zdata); $('#zave').text(zave.toFixed(3));
+    zvariance = arrVariance(zdata, zave); $('#zvariance').text(zvariance.toFixed(3));
+}
+
+////////////////////////////////////////////////////////////////////
+//Function(3): 最新フレームにおける特徴量(feature)から、現在のユーザの
+//行動を分類 (classify) する関数          
+//  - ここに書いてあるのは、手打ちで書いたサンプルのif文ロジックです
+//  - 実際には機械学習エンジンが出力したif文の固まり (決定木アルゴリズムの場合)
+//  - がここに入ります
+////////////////////////////////////////////////////////////////////
+function classify(){
+    // 機械学習モデル（決定木）から生成された分類器
+    // 精度: 96.54% (10-fold CV)
+    // 特徴量: 12個（X,Y,Z軸の max, min, ave, variance）
+    
+    if (yvariance <= 3.665817) {
+        return "still";
+    } else {
+        if (ymin <= -5.685102) {
+            if (yave <= 0.501553) {
+                if (yvariance <= 33.768240) {
+                    if (xmin <= -12.751456) {
+                        return "tuugaku_walk";
+                    } else {
+                        return "yotsunbai";
+                    }
+                } else {
+                    return "tuugaku_walk";
+                }
+            } else {
+                if (yvariance <= 11.802041) {
+                    return "yotsunbai";
+                } else {
+                    return "tuugaku_walk";
+                }
+            }
+        } else {
+            if (xvariance <= 10.463499) {
+                return "tuugaku_walk";
+            } else {
+                return "sanpo";
+            }
+        }
+    }
+}
+
+</script>
+<!--  ===========================================  -->
+
+
+</html>
