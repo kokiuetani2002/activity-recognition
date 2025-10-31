@@ -18,6 +18,37 @@
   <body>
     <h1 style="text-align: center; color: #1976d2;">📱 Activity Recognition Data Collection</h1>
     
+    <h2>🔧 Step 0: Test / テスト機能（先に必ずチェック！）</h2>
+    <div style="background-color: #fff3e0; padding: 15px; margin: 10px 0; border: 3px solid #ff9800; border-radius: 10px;">
+      <h3 style="color: #ff6f00; margin-top: 0;">⚠️ データ収集前に必ずテスト！</h3>
+      
+      <div style="margin: 15px 0; padding: 10px; background-color: white; border-radius: 5px;">
+        <h4>📱 センサー権限状態 / Sensor Permission Status</h4>
+        <p>状態 / Status: <span id="permission_status" style="font-weight: bold; font-size: 1.3em; color: red;">未確認 / Not Checked</span></p>
+        <button onclick="checkPermission()" style="padding: 10px 20px; margin: 5px; font-size: 1.1em; background-color: #2196F3; color: white; border: none; cursor: pointer; border-radius: 5px;">🔍 権限確認 / Check Permission</button>
+      </div>
+      
+      <div style="margin: 15px 0; padding: 10px; background-color: white; border-radius: 5px;">
+        <h4>🎵 音声テスト / Audio Test</h4>
+        <p>音が鳴るか確認 / Check if sound plays</p>
+        <button onclick="testSound()" style="padding: 10px 20px; margin: 5px; font-size: 1.1em; background-color: #4CAF50; color: white; border: none; cursor: pointer; border-radius: 5px;">🔊 音テスト / Test Sound</button>
+        <p>結果 / Result: <span id="sound_test_result" style="font-weight: bold;">--</span></p>
+      </div>
+      
+      <div style="margin: 15px 0; padding: 10px; background-color: white; border-radius: 5px;">
+        <h4>📊 センサーテスト / Sensor Test</h4>
+        <p>加速度センサーが動作するか5秒間テスト / Test sensor for 5 seconds</p>
+        <button onclick="testSensor()" style="padding: 10px 20px; margin: 5px; font-size: 1.1em; background-color: #9C27B0; color: white; border: none; cursor: pointer; border-radius: 5px;">📡 センサーテスト / Test Sensor</button>
+        <p>データ数 / Data count: <span id="test_data_count" style="font-weight: bold; font-size: 1.2em; color: green;">0</span></p>
+        <p>最新データ / Latest: X=<span id="test_x">--</span>, Y=<span id="test_y">--</span>, Z=<span id="test_z">--</span></p>
+      </div>
+      
+      <div style="margin: 15px 0; padding: 15px; background-color: #ffebee; border-radius: 5px; border: 2px solid #f44336;">
+        <p style="margin: 5px 0; font-weight: bold;">✅ 全てのテストがOKなら、下に進んでください</p>
+        <p style="margin: 5px 0; font-weight: bold;">❌ NGの場合は、ブラウザ設定で「モーションとセンサー」を許可してください</p>
+      </div>
+    </div>
+    
     <h2>Step 1: Select Activity / 行動を選択</h2>
     <div style="background-color: #f0f0f0; padding: 15px; margin: 10px 0;">
       <div style="margin: 10px 0;">
@@ -153,6 +184,10 @@ var currentLabel = 'none'; // Current activity label
 var timerInterval = null; // Timer interval ID
 var remainingTime = 0; // Remaining time in seconds
 var isCollecting = false; // Flag to track if collection is active
+
+//Test variables
+var testDataCount = 0; // Counter for test data
+var testInterval = null; // Test timer interval
 
 //////////////////////////////////////////////////////
 //Function to get sensor access permission from the browser
@@ -291,6 +326,126 @@ function classify(){
     }
     */
 
+}
+
+////////////////////////////////////////////////////////////////////
+//Test Functions / テスト機能
+////////////////////////////////////////////////////////////////////
+
+// Check sensor permission
+function checkPermission(){
+    $('#permission_status').text('確認中... / Checking...').css('color', 'orange');
+    
+    if ( DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function' ){
+        // iOS 13+ の Safari
+        DeviceMotionEvent.requestPermission().then(permissionState => {
+            if (permissionState === 'granted') {
+                $('#permission_status').text('✅ 許可済み / Granted').css('color', 'green');
+                alert('✅ センサー権限OK！/ Sensor permission granted!');
+            } else {
+                $('#permission_status').text('❌ 拒否 / Denied').css('color', 'red');
+                alert('❌ センサー権限が拒否されました。ブラウザ設定を確認してください。\n\nSensor permission denied. Please check browser settings.');
+            }
+        }).catch(function(error){
+            $('#permission_status').text('❌ エラー / Error: ' + error).css('color', 'red');
+            alert('❌ エラー: ' + error);
+        });
+    } else {
+        // For other devices (Android, etc.)
+        $('#permission_status').text('✅ 権限不要（Android等） / Permission not required').css('color', 'green');
+        alert('✅ このデバイスは権限確認不要です（Android等）\n\nPermission check not required for this device.');
+    }
+}
+
+// Test sound
+function testSound(){
+    $('#sound_test_result').text('テスト中... / Testing...').css('color', 'orange');
+    
+    if (window.AudioContext || window.webkitAudioContext) {
+        try {
+            // Play 3 different beeps
+            playBeep(440, 200);
+            setTimeout(function(){ playBeep(660, 200); }, 300);
+            setTimeout(function(){ playBeep(880, 200); }, 600);
+            
+            $('#sound_test_result').text('✅ OK - 音が鳴りました / Sound played').css('color', 'green');
+            setTimeout(function(){
+                alert('✅ 音声テストOK！3つのビープ音が聞こえましたか？\n\nAudio test OK! Did you hear 3 beeps?');
+            }, 1000);
+        } catch(e) {
+            $('#sound_test_result').text('❌ エラー / Error: ' + e.message).css('color', 'red');
+            alert('❌ 音声エラー: ' + e.message);
+        }
+    } else {
+        $('#sound_test_result').text('❌ 非対応 / Not supported').css('color', 'red');
+        alert('❌ このブラウザは音声をサポートしていません\n\nAudio not supported in this browser');
+    }
+}
+
+// Test sensor for 5 seconds
+function testSensor(){
+    if(testInterval){
+        alert('テスト実行中です / Test already running');
+        return;
+    }
+    
+    testDataCount = 0;
+    $('#test_data_count').text('0');
+    $('#test_x').text('--');
+    $('#test_y').text('--');
+    $('#test_z').text('--');
+    
+    alert('5秒間センサーテストを開始します！\nスマホを動かしてみてください。\n\n5-second sensor test starting!\nPlease move your phone.');
+    
+    // Handler for test
+    function handleTestAcceleration(ev){
+        testDataCount++;
+        $('#test_data_count').text(testDataCount);
+        $('#test_x').text(ev.acceleration.x.toFixed(3));
+        $('#test_y').text(ev.acceleration.y.toFixed(3));
+        $('#test_z').text(ev.acceleration.z.toFixed(3));
+    }
+    
+    // Request permission and start test
+    if ( DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function' ){
+        // iOS 13+ の Safari
+        DeviceMotionEvent.requestPermission().then(permissionState => {
+            if (permissionState === 'granted') {
+                window.addEventListener("devicemotion", handleTestAcceleration, false);
+                
+                // Stop after 5 seconds
+                testInterval = setTimeout(function(){
+                    window.removeEventListener("devicemotion", handleTestAcceleration, false);
+                    testInterval = null;
+                    
+                    if(testDataCount > 0){
+                        alert('✅ センサーテストOK！\n' + testDataCount + ' 個のデータを取得しました。\n\n✅ Sensor test OK!\nCollected ' + testDataCount + ' data points.');
+                    } else {
+                        alert('❌ センサーからデータが取得できませんでした。\nブラウザ設定を確認してください。\n\n❌ No sensor data received.\nPlease check browser settings.');
+                    }
+                }, 5000);
+            } else {
+                alert('❌ センサー権限が拒否されました\n\n❌ Sensor permission denied');
+            }
+        }).catch(function(error){
+            alert('❌ エラー: ' + error);
+        });
+    } else {
+        // For other devices
+        window.addEventListener("devicemotion", handleTestAcceleration, false);
+        
+        // Stop after 5 seconds
+        testInterval = setTimeout(function(){
+            window.removeEventListener("devicemotion", handleTestAcceleration, false);
+            testInterval = null;
+            
+            if(testDataCount > 0){
+                alert('✅ センサーテストOK！\n' + testDataCount + ' 個のデータを取得しました。\n\n✅ Sensor test OK!\nCollected ' + testDataCount + ' data points.');
+            } else {
+                alert('❌ センサーからデータが取得できませんでした。\n\n❌ No sensor data received.');
+            }
+        }, 5000);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////
