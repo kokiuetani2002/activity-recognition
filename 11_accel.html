@@ -189,6 +189,26 @@ var isCollecting = false; // Flag to track if collection is active
 var testDataCount = 0; // Counter for test data
 var testInterval = null; // Test timer interval
 
+//Audio context (create once and reuse)
+var audioContext = null;
+
+// Initialize audio context on first user interaction
+function initAudioContext(){
+    if(!audioContext && (window.AudioContext || window.webkitAudioContext)){
+        try {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            // Resume context for iOS Safari
+            if(audioContext.state === 'suspended'){
+                audioContext.resume();
+            }
+            console.log('AudioContext initialized');
+        } catch(e) {
+            console.log('AudioContext init failed:', e);
+        }
+    }
+    return audioContext;
+}
+
 //////////////////////////////////////////////////////
 //Function to get sensor access permission from the browser
 //////////////////////////////////////////////////////
@@ -363,14 +383,30 @@ function testSound(){
     
     if (window.AudioContext || window.webkitAudioContext) {
         try {
+            // Initialize audio context on user click
+            var ctx = initAudioContext();
+            
+            if(!ctx){
+                $('#sound_test_result').text('❌ AudioContext失敗 / Failed').css('color', 'red');
+                alert('❌ AudioContextの初期化に失敗しました');
+                return;
+            }
+            
+            // Resume if needed (critical for iOS)
+            if(ctx.state === 'suspended'){
+                ctx.resume().then(function(){
+                    console.log('AudioContext resumed');
+                });
+            }
+            
             // Play 3 different beeps
             playBeep(440, 200);
             setTimeout(function(){ playBeep(660, 200); }, 300);
             setTimeout(function(){ playBeep(880, 200); }, 600);
             
-            $('#sound_test_result').text('✅ OK - 音が鳴りました / Sound played').css('color', 'green');
+            $('#sound_test_result').text('✅ OK - 音を再生しました / Sound played').css('color', 'green');
             setTimeout(function(){
-                alert('✅ 音声テストOK！3つのビープ音が聞こえましたか？\n\nAudio test OK! Did you hear 3 beeps?');
+                alert('✅ 音声テスト完了！\n\n3つのビープ音（低→中→高）が聞こえましたか？\n聞こえなかった場合:\n・音量を上げる\n・マナーモード解除\n・ブラウザを変える（Chrome推奨）\n\nAudio test OK! Did you hear 3 beeps?');
             }, 1000);
         } catch(e) {
             $('#sound_test_result').text('❌ エラー / Error: ' + e.message).css('color', 'red');
@@ -533,6 +569,9 @@ function start30SecondCollection(){
         return;
     }
     
+    // Initialize audio context on user click (important!)
+    initAudioContext();
+    
     alert('3秒後にデータ収集を開始します！スマホをポケットに入れてください。\n\nData collection will start in 3 seconds! Put your phone in your pocket.');
     
     // Start timer immediately (will show 3-second preparation)
@@ -644,26 +683,49 @@ function stopTimer(){
     alert('2分間のデータ収集が完了しました！/ 2-minute collection completed!\n\n収集データ数 / Data points: ' + collectedData.length);
 }
 
-// Play beep sound
+// Play beep sound (improved version)
 function playBeep(frequency, duration){
     try {
-        var audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        var oscillator = audioContext.createOscillator();
-        var gainNode = audioContext.createGain();
+        // Initialize audio context if not already done
+        var ctx = initAudioContext();
+        
+        if(!ctx){
+            console.log('AudioContext not available');
+            return;
+        }
+        
+        // Resume if suspended (important for iOS)
+        if(ctx.state === 'suspended'){
+            ctx.resume().then(function(){
+                playBeepInternal(ctx, frequency, duration);
+            });
+        } else {
+            playBeepInternal(ctx, frequency, duration);
+        }
+    } catch(e) {
+        console.log('Audio error:', e);
+    }
+}
+
+// Internal beep function
+function playBeepInternal(ctx, frequency, duration){
+    try {
+        var oscillator = ctx.createOscillator();
+        var gainNode = ctx.createGain();
         
         oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        gainNode.connect(ctx.destination);
         
         oscillator.frequency.value = frequency;
         oscillator.type = 'sine';
         
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration/1000);
+        gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration/1000);
         
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + duration/1000);
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + duration/1000);
     } catch(e) {
-        console.log('Audio not supported:', e);
+        console.log('Beep error:', e);
     }
 }
 
