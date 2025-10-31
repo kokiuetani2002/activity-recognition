@@ -34,9 +34,10 @@
       
     <h2>Step 2: Start Collection / データ収集開始</h2>
     <div style="margin: 15px 0; padding: 20px; background-color: #fff9c4; border-radius: 10px; text-align: center;">
-      <p style="font-size: 1.1em; margin-bottom: 15px;">👇 このボタン1つで全て自動！<br>（センサー許可 → 30秒収集 → 自動停止）</p>
-      <button onclick="start30SecondCollection()" style="padding: 20px 40px; margin: 10px; font-size: 1.5em; background-color: #2196F3; color: white; border: none; cursor: pointer; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">⏱️ 30秒間データ収集開始<br>Start 30s Collection</button>
-      <p style="margin-top: 15px;">残り時間 / Time Remaining: <span id="timer_display" style="color: red; font-weight: bold; font-size: 2.5em;">--</span> 秒</p>
+      <p style="font-size: 1.1em; margin-bottom: 15px;">👇 このボタン1つで全て自動！<br>（センサー許可 → <strong>3秒準備</strong> → <strong>2分間収集</strong> → 自動停止）</p>
+      <button onclick="start30SecondCollection()" style="padding: 20px 40px; margin: 10px; font-size: 1.5em; background-color: #2196F3; color: white; border: none; cursor: pointer; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">⏱️ 2分間データ収集開始<br>Start 2min Collection<br><small style="font-size: 0.6em;">（3秒準備 + 120秒収集）</small></button>
+      <p style="margin-top: 15px;"><span id="status_display" style="color: orange; font-weight: bold; font-size: 1.3em;">準備中 / Preparing</span></p>
+      <p style="margin-top: 5px;">残り時間 / Time Remaining: <span id="timer_display" style="color: red; font-weight: bold; font-size: 2.5em;">--</span> 秒</p>
     </div>
     
     <h2>Step 3: Download / データダウンロード</h2>
@@ -360,10 +361,10 @@ function clearCollectedData(){
 }
 
 ////////////////////////////////////////////////////////////////////
-//30-Second Timer Functions / 30秒タイマー機能
+//2-Minute Timer Functions / 2分間タイマー機能（3秒準備 + 120秒収集）
 ////////////////////////////////////////////////////////////////////
 
-// Start 30-second data collection
+// Start 2-minute data collection with 3-second preparation
 function start30SecondCollection(){
     // Check if label is set
     if(currentLabel === 'none'){
@@ -377,53 +378,90 @@ function start30SecondCollection(){
         return;
     }
     
-    // Start motion sensing if not already started
-    if ( DeviceMotionEvent &&
-         typeof DeviceMotionEvent.requestPermission === 'function' ){
-        // iOS 13+ の Safari
-        DeviceMotionEvent.requestPermission().then(permissionState => {
-            if (permissionState === 'granted') {
-                window.addEventListener("devicemotion", handleAcceleration, false);
-                startTimer();
-            } else {
-                alert("Permission not granted! / 許可されませんでした！");
-            }
-        }).catch(console.error)
-    } else {
-        // For other devices
-        window.addEventListener("devicemotion", handleAcceleration, false);
-        startTimer();
-    }
+    alert('3秒後にデータ収集を開始します！スマホをポケットに入れてください。\n\nData collection will start in 3 seconds! Put your phone in your pocket.');
+    
+    // Start timer immediately (will show 3-second preparation)
+    startTimer();
+    
+    // Start motion sensing after 3 seconds
+    setTimeout(function(){
+        if ( DeviceMotionEvent &&
+             typeof DeviceMotionEvent.requestPermission === 'function' ){
+            // iOS 13+ の Safari
+            DeviceMotionEvent.requestPermission().then(permissionState => {
+                if (permissionState === 'granted') {
+                    window.addEventListener("devicemotion", handleAcceleration, false);
+                } else {
+                    alert("Permission not granted! / 許可されませんでした！");
+                    stopTimer();
+                }
+            }).catch(function(error){
+                console.error(error);
+                stopTimer();
+            });
+        } else {
+            // For other devices
+            window.addEventListener("devicemotion", handleAcceleration, false);
+        }
+    }, 3000); // Wait 3 seconds before starting sensor
 }
 
 // Start the timer
 function startTimer(){
     isCollecting = true;
-    remainingTime = 30;
-    $('#timer_display').text(remainingTime);
+    remainingTime = 123; // 3 seconds preparation + 120 seconds collection
+    
+    // Show "準備中" initially
+    $('#status_display').text('準備中 / Preparing').css('color', 'orange');
+    $('#timer_display').text('3').css('color', 'orange');
     
     // Beep sound at start
     if (window.AudioContext || window.webkitAudioContext) {
         playBeep(440, 200); // 440Hz for 200ms
     }
     
-    alert('30秒間のデータ収集を開始します！/ Starting 30-second collection!');
-    
     // Update timer every second
     timerInterval = setInterval(function(){
         remainingTime--;
-        $('#timer_display').text(remainingTime);
         
-        // When time is up
-        if(remainingTime <= 0){
-            stopTimer();
-        }
-        
-        // Beep at 10, 5, 3, 2, 1 seconds remaining
-        if(remainingTime === 10 || remainingTime === 5 || remainingTime <= 3 && remainingTime > 0){
+        // First 3 seconds: Preparation phase
+        if(remainingTime > 120){
+            var prepTime = remainingTime - 120;
+            $('#timer_display').text(prepTime).css('color', 'orange');
+            $('#status_display').text('準備中 / Preparing').css('color', 'orange');
+            
+            // Beep during preparation countdown
             if (window.AudioContext || window.webkitAudioContext) {
-                playBeep(880, 100); // Higher pitch beep
+                playBeep(660, 100);
             }
+        }
+        // Collection phase (120 seconds)
+        else if(remainingTime === 120){
+            // Start of data collection
+            $('#status_display').text('収集中 / Collecting').css('color', 'green');
+            $('#timer_display').text(remainingTime).css('color', 'red');
+            
+            // Double beep to signal start of actual collection
+            if (window.AudioContext || window.webkitAudioContext) {
+                playBeep(880, 150);
+                setTimeout(function(){ playBeep(880, 150); }, 200);
+            }
+        }
+        else if(remainingTime > 0){
+            // Normal collection countdown
+            $('#timer_display').text(remainingTime).css('color', 'red');
+            
+            // Beep at 60, 30, 10, 5, 3, 2, 1 seconds remaining
+            if(remainingTime === 60 || remainingTime === 30 || remainingTime === 10 || 
+               remainingTime === 5 || (remainingTime <= 3 && remainingTime > 0)){
+                if (window.AudioContext || window.webkitAudioContext) {
+                    playBeep(880, 100); // Higher pitch beep
+                }
+            }
+        }
+        else{
+            // Time is up
+            stopTimer();
         }
     }, 1000);
 }
@@ -437,7 +475,8 @@ function stopTimer(){
     
     isCollecting = false;
     remainingTime = 0;
-    $('#timer_display').text('--');
+    $('#timer_display').text('--').css('color', 'red');
+    $('#status_display').text('完了 / Completed').css('color', 'blue');
     
     // Stop motion sensing
     window.removeEventListener("devicemotion", handleAcceleration, false);
@@ -447,7 +486,7 @@ function stopTimer(){
         playBeep(220, 500);
     }
     
-    alert('30秒間のデータ収集が完了しました！/ 30-second collection completed!\n\n収集データ数 / Data points: ' + collectedData.length);
+    alert('2分間のデータ収集が完了しました！/ 2-minute collection completed!\n\n収集データ数 / Data points: ' + collectedData.length);
 }
 
 // Play beep sound
